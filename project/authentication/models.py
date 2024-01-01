@@ -1,5 +1,12 @@
+from contextvars import Token
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.dispatch import receiver
+from django.utils import timezone
+from django.db.models.signals import post_save
+# from django.core.validators import RegexValidator
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -23,7 +30,13 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
+    # phone_regex = RegexValidator(
+    #     regex=r'^8\d{10}$',
+    #     message="Phone number must be entered in the format: '8 xxx xxx xx xx'. Up to 11 digits allowed."
+    # )
+    # phone = models.CharField(validators=[phone_regex], max_length=12, verbose_name='Mobile phone', unique=True, default='8 xxx xxx xx xx')
     email = models.EmailField(unique=True)
+    username = models.CharField(max_length=20, unique=True)
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=30, blank=True)
     is_active = models.BooleanField(default=True)
@@ -32,7 +45,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     objects = CustomUserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
+    REQUIRED_FIELDS = ['username']
 
     def __str__(self):
         return self.email
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_auth_token(sender, instance=None, created=False, **kwargs):
+    if created:
+        Token.objects.create(user=instance)
